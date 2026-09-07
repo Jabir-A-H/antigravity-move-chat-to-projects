@@ -5,29 +5,28 @@
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)]()
 [![Platform: Cross-Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-A lightweight, zero-dependency CLI utility to transplant conversations, agent trajectory history, execution metadata, artifacts, and plans between projects/workspaces in **Google Antigravity**.
+A lightweight, zero-dependency CLI utility to move, migrate, and transplant conversations, agent trajectory history, execution metadata, artifacts, and plans between projects/workspaces in **Google Antigravity**.
 
 ---
 
 ## 🎯 The Problem
 
-In Google Antigravity, conversations are cryptographically bound to specific workspace paths, internal hashes, and Protobuf bindings at creation time.
+You fire up Antigravity and start brainstorming or generating ideas for something new. The agent produces solid plans, code snippets, and architecture... but then you realize: **the chat was either in no-workspace mode, or accidentally started inside a completely different project.**
 
-If you start an exploratory chat (or brainstorm in a temporary workspace) and later realize:
-- *"I need this entire conversation history inside my actual project workspace."*
-- *"I want the agent to retain all trajectory steps, file modifications, and planning context."*
-- *"I want the generated artifacts (`implementation_plan.md`, `walkthrough.md`, `task.md`) and subagent transcripts preserved."*
+Up until now, you were stuck with two equally frustrating options:
+1. **Rerun the prompt** in the new project and hope the agent doesn't hallucinate or drift.
+2. **Manually copy-paste** all markdown plans, task lists, code chunks, and context across files.
 
-Currently, Antigravity has no built-in **"Move Chat to Workspace"** button. Copying raw databases directly breaks Protobuf workspace bindings.
+Currently, Antigravity has no built-in **"Move Chat to Workspace"** or **"Export/Import"** button. If you try to manually copy `.db` files from `~/.gemini/antigravity/conversations`, it breaks because conversations are cryptographically bound to specific workspace hashes and compiled Protobuf headers.
 
 ## 💡 The Solution
 
 **`transplant_chat.py`** safely transplants the conversation:
-1. **Preserves Workspace Bindings**: Retains the target workspace's native Protobuf hashes and workspace mapping.
-2. **Transfers Trajectory History**: Copies SQLite trajectory tables (`steps`, `gen_metadata`, `executor_metadata`, `parent_references`, `battle_mode_infos`).
-3. **Migrates Agent Brain & Artifacts**: Copies all plans, walkthroughs, artifacts, and JSONL transcripts into the target brain folder.
-4. **Synchronizes Sidebar Title**: Updates the `.pbtxt` metadata so the chat appears with its proper title in the Antigravity sidebar.
-5. **Zero Data Loss / Automatic Backups**: Automatically creates timestamped backups of both the target database and the target brain directory before modifying anything.
+1. **No Setup Needed:** Runs directly with standard Python standard libraries—no `pip install` or extra packages required.
+2. **Transfers Full Context & Plans:** Moves over every message, tool action, and generated file (`implementation_plan.md`, `walkthrough.md`, `task.md`) so the AI remembers everything without missing a beat.
+3. **Preserves Native Workspace Bindings:** Keeps the destination workspace's valid Protobuf headers, hashes, and session tokens so Antigravity doesn't crash or discard the chat.
+4. **Synchronizes Sidebar Title:** Automatically updates `.pbtxt` metadata so the chat appears with its proper title in the Antigravity sidebar.
+5. **Auto-Backups for Safety:** Creates automatic timestamped backups of both the target database and the target brain directory before touching anything.
 
 ---
 
@@ -55,22 +54,23 @@ flowchart LR
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (3 Simple Steps)
 
-### Step 1: Fully Close Antigravity
-Ensure Google Antigravity is completely shut down so SQLite database locks are released.
-
-### Step 2: Create a Target Placeholder Chat
+### Step 1: Create an Empty Placeholder Chat
 1. Open Antigravity and navigate to your **target project/workspace**.
-2. Start a new chat, send a single short message (e.g. `hi`), and wait for the agent to reply.
-   *(This initializes the target database and workspace bindings).*
-3. Close Antigravity again.
+2. Start a new chat, send a 1-word message (like `hi`), and wait for the agent to reply.
+   *(This initializes the target database and native workspace bindings).*
 
 > [!TIP]
 > **Safety First — Note Down Your IDs:**
 > It is always recommended to note down your source and target chat titles/IDs in a notepad before closing. While the `--list` command below makes it easy to find them, having them written down ensures you double-check and transplant into the right conversation!
 
-### Step 3: Find Your Conversation IDs
+### Step 2: Close Antigravity Completely
+Shut down Google Antigravity so SQLite database locks are released.
+
+### Step 3: Run the CLI Tool
+
+#### A. Find Your Conversation IDs (Optional)
 Run the built-in `--list` command to see your recent conversations:
 
 ```bash
@@ -92,18 +92,18 @@ Last Modified        | Conversation ID (UUID)                 | Title
 - **Source UUID**: The chat you want to move (e.g. `7b7c0bee-****-****-****-************`).
 - **Target UUID**: The placeholder chat you just created (e.g. `21e82bc8-****-****-****-************`).
 
-### Step 4: Run the Transplant Command
+#### B. Run the Transplant
 
 ```bash
-python transplant_chat.py <SRC_ID> <DST_ID>
+python transplant_chat.py <SOURCE_UUID> <DEST_UUID>
 ```
 
-Example:
+Example (with optional custom sidebar title):
 ```bash
 python transplant_chat.py 7b7c0bee-****-****-****-************ 21e82bc8-****-****-****-************ "My New Feature Plan"
 ```
 
-### Step 5: Reopen Antigravity
+### Step 4: Reopen Antigravity
 Launch Antigravity and open your target project. Your complete conversation, steps, planning artifacts, and history will be waiting for you!
 
 ---

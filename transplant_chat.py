@@ -7,8 +7,8 @@ from any source conversation into a destination conversation in another workspac
 preserving the destination's native Protobuf workspace bindings and hashes.
 
 Usage:
-  1. Close Antigravity completely.
-  2. In your target workspace, open a new chat and send a 1-word message (e.g. "hi").
+  1. In your target workspace, open a new chat and send a 1-word message (e.g. "hi").
+  2. Close Antigravity completely.
   3. Run via CLI:
        python transplant_chat.py --list
        python transplant_chat.py <SRC_ID> <DST_ID> ["Optional New Title"]
