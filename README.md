@@ -1,11 +1,14 @@
 # Antigravity Move Chat to Projects (Universal Conversation Transplanter)
 
+[![Latest Release](https://img.shields.io/github/v/release/Jabir-A-H/antigravity-move-chat-to-projects?color=blue)](https://github.com/Jabir-A-H/antigravity-move-chat-to-projects/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)]()
 [![Platform: Cross-Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
 A lightweight, zero-dependency CLI utility to move, migrate, and transplant conversations, agent trajectory history, execution metadata, artifacts, and plans between projects/workspaces in **Google Antigravity**.
+
+> 📦 **Quick Download:** Download [`transplant_chat.py`](https://raw.githubusercontent.com/Jabir-A-H/antigravity-move-chat-to-projects/main/transplant_chat.py) directly (Right-click → *Save link as...*) or grab the script from the [Latest Release](https://github.com/Jabir-A-H/antigravity-move-chat-to-projects/releases/latest).
 
 ---
 
