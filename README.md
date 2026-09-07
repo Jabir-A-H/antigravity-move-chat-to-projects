@@ -66,6 +66,10 @@ Ensure Google Antigravity is completely shut down so SQLite database locks are r
    *(This initializes the target database and workspace bindings).*
 3. Close Antigravity again.
 
+> [!TIP]
+> **Safety First — Note Down Your IDs:**
+> It is always recommended to note down your source and target chat titles/IDs in a notepad before closing. While the `--list` command below makes it easy to find them, having them written down ensures you double-check and transplant into the right conversation!
+
 ### Step 3: Find Your Conversation IDs
 Run the built-in `--list` command to see your recent conversations:
 
@@ -80,13 +84,13 @@ Output:
 =====================================================================================
 Last Modified        | Conversation ID (UUID)                 | Title
 -------------------------------------------------------------------------------------
-2026-09-08 00:30:15  | 21e82bc8-5d44-4b77-a21d-1672c97a4ee6  | hi
-2026-09-08 00:15:42  | 7b7c0bee-9b78-41e1-b91a-fc664c4707ca  | Refactor Auth & Database
+2026-09-08 00:30:15  | 21e82bc8-****-****-****-************  | hi
+2026-09-08 00:15:42  | 7b7c0bee-****-****-****-************  | Refactor Auth & Database
 ...
 =====================================================================================
 ```
-- **Source UUID**: The chat you want to move (e.g. `7b7c0bee-9b78-41e1-b91a-fc664c4707ca`).
-- **Target UUID**: The placeholder chat you just created (e.g. `21e82bc8-5d44-4b77-a21d-1672c97a4ee6`).
+- **Source UUID**: The chat you want to move (e.g. `7b7c0bee-****-****-****-************`).
+- **Target UUID**: The placeholder chat you just created (e.g. `21e82bc8-****-****-****-************`).
 
 ### Step 4: Run the Transplant Command
 
@@ -94,9 +98,9 @@ Last Modified        | Conversation ID (UUID)                 | Title
 python transplant_chat.py <SRC_ID> <DST_ID>
 ```
 
-Optional: You can supply a custom title for the sidebar:
+Example:
 ```bash
-python transplant_chat.py <SRC_ID> <DST_ID> "My New Feature Plan"
+python transplant_chat.py 7b7c0bee-****-****-****-************ 21e82bc8-****-****-****-************ "My New Feature Plan"
 ```
 
 ### Step 5: Reopen Antigravity

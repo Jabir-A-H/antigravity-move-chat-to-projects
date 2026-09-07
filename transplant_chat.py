@@ -218,10 +218,10 @@ Examples:
   python transplant_chat.py --list
 
   # Move conversation to target workspace:
-  python transplant_chat.py 7b7c0bee-9b78-41e1-b91a-fc664c4707ca 21e82bc8-5d44-4b77-a21d-1672c97a4ee6
+  python transplant_chat.py 7b7c0bee-****-****-****-************ 21e82bc8-****-****-****-************
 
   # Move conversation and specify a custom title:
-  python transplant_chat.py 7b7c0bee-9b78-41e1-b91a-fc664c4707ca 21e82bc8-5d44-4b77-a21d-1672c97a4ee6 "Refactored Auth Flow"
+  python transplant_chat.py 7b7c0bee-****-****-****-************ 21e82bc8-****-****-****-************ "Refactored Auth Flow"
 """,
     )
     parser.add_argument(
