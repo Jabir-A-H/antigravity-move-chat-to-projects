@@ -40,6 +40,15 @@ Currently, Antigravity has no built-in **"Move Chat to Workspace"** or **"Export
 7. **Synchronizes Sidebar Title:** Automatically updates `.pbtxt` metadata so the chat appears with its proper title in the Antigravity sidebar.
 8. **Auto-Backups for Safety:** Creates automatic timestamped backups of both the target database and target brain directory before modifying anything.
 
+> [!WARNING]
+> **Important Note on Antigravity IDE Upstream Limitations:**
+> While `transplant_chat.py` cleanly snapshots and writes IDE conversation databases, **the Antigravity IDE itself currently suffers from well-documented upstream UI bugs**—its embedded VS Code webview frequently fails to switch between past conversations or displays them as blank / `(Untitled Conversation)`.
+> 
+> **💡 Rescue Stuck IDE Chats:** If an important chat becomes inaccessible or stuck inside the IDE, you can use `transplant_chat.py` to transplant it out of the IDE and into the **Antigravity Desktop App**, where conversation switching and multi-project management work reliably:
+> ```bash
+> python transplant_chat.py <STUCK_IDE_UUID> <DESKTOP_UUID>
+> ```
+
 ---
 
 ## 🔄 How It Works
@@ -250,7 +259,9 @@ Within each environment:
 
 ## 💻 Compatibility
 
-- **Surfaces**: Antigravity Desktop App & Antigravity IDE
+- **Surfaces**:
+  - **Antigravity Desktop App**: Fully supported with complete sidebar history and switching.
+  - **Antigravity IDE**: Data-level support fully functional (see notice above regarding upstream IDE conversation switching UI bugs).
 - **OS**: Windows, macOS, Linux
 - **Python**: 3.8 or higher
 - **Dependencies**: None (uses standard Python library: `sqlite3`, `zipfile`, `tempfile`, `json`, `shutil`, `re`, `argparse`, `os`, `sys`)
