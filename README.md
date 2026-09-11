@@ -6,7 +6,7 @@
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)]()
 [![Platform: Cross-Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-A lightweight, zero-dependency CLI utility to move, migrate, backup, export, and transplant conversations, agent trajectory history, execution metadata, artifacts, and plans between projects/workspaces in **Google Antigravity**—either on the same machine or across different computers (e.g. Personal PC to Office PC).
+A lightweight, zero-dependency CLI utility to move, migrate, backup, export, and transplant conversations, agent trajectory history, execution metadata, artifacts, and plans between projects/workspaces in **Google Antigravity Desktop App** and **Antigravity IDE**—either on the same machine or across different computers (e.g. Personal PC to Office PC).
 
 > 📦 **Quick Download:** Download [`transplant_chat.py`](https://raw.githubusercontent.com/Jabir-A-H/antigravity-move-chat-to-projects/main/transplant_chat.py) directly (Right-click → *Save link as...*) or grab the script from the [Latest Release](https://github.com/Jabir-A-H/antigravity-move-chat-to-projects/releases/latest).
 
@@ -14,9 +14,10 @@ A lightweight, zero-dependency CLI utility to move, migrate, backup, export, and
 
 ## 🎯 The Problem
 
-You fire up Antigravity and start brainstorming or generating ideas for something new. The agent produces solid plans, code snippets, and architecture... but then you realize:
+You fire up Antigravity (or the Antigravity IDE) and start brainstorming or generating ideas for something new. The agent produces solid plans, code snippets, and architecture... but then you realize:
 1. **The chat was started in no-workspace mode, or inside a completely different project.**
-2. **You need to switch devices** (e.g. from your home/personal PC to your office workstation) and want to bring your full conversation and planning state with you.
+2. **You want to move a conversation between the Desktop App and the Antigravity IDE.**
+3. **You need to switch devices** (e.g. from your home/personal PC to your office workstation) and want to bring your full conversation and planning state with you.
 
 Up until now, you were stuck with frustrating workarounds:
 1. **Rerunning the prompt** in the new project and hoping the agent doesn't hallucinate or drift.
@@ -31,27 +32,28 @@ Currently, Antigravity has no built-in **"Move Chat to Workspace"** or **"Export
 
 **`transplant_chat.py`** provides a complete migration and backup toolkit:
 1. **Zero External Dependencies:** Runs directly with standard Python 3.8+ (`sqlite3`, `zipfile`, `shutil`, `re`, `json`, `argparse`)—no `pip install` or extra packages needed.
-2. **Move Chats Locally:** Move conversations between workspaces on the same computer with a single command.
-3. **Export & Import Across Devices (.zip):** Package an entire conversation into a standalone, compressed `.zip` backup archive. Take just that `.zip` file to your office computer, and import it into any chat.
-4. **Preserves Native Workspace Bindings:** Keeps the destination workspace's valid Protobuf headers, hashes, and session tokens so Antigravity doesn't crash or discard the chat.
-5. **Transfers Full Context & Plans:** Restores every message, tool action, and generated artifact (`implementation_plan.md`, `walkthrough.md`, `task.md`, transcript logs) so the AI remembers everything.
-6. **Synchronizes Sidebar Title:** Automatically updates `.pbtxt` metadata so the chat appears with its proper title in the Antigravity sidebar.
-7. **Auto-Backups for Safety:** Creates automatic timestamped backups of both the target database and target brain directory before modifying anything.
+2. **Desktop App & Antigravity IDE Support:** Seamlessly works with both **Antigravity Desktop App** (`~/.gemini/antigravity`) and **Antigravity IDE** (`~/.gemini/antigravity-ide`), including cross-environment transplants!
+3. **Move Chats Locally:** Move conversations between workspaces on the same computer with a single command.
+4. **Export & Import Across Devices (.zip):** Package an entire conversation into a standalone, compressed `.zip` backup archive. Take just that `.zip` file to your office computer, and import it into any chat.
+5. **Preserves Native Workspace Bindings:** Keeps the destination workspace's valid Protobuf headers, hashes, and session tokens so Antigravity doesn't crash or discard the chat.
+6. **Transfers Full Context & Plans:** Restores every message, tool action, and generated artifact (`implementation_plan.md`, `walkthrough.md`, `task.md`, transcript logs) so the AI remembers everything.
+7. **Synchronizes Sidebar Title:** Automatically updates `.pbtxt` metadata so the chat appears with its proper title in the Antigravity sidebar.
+8. **Auto-Backups for Safety:** Creates automatic timestamped backups of both the target database and target brain directory before modifying anything.
 
 ---
 
 ## 🔄 How It Works
 
-### Scenario A: Same Computer (Direct Workspace Transplant)
+### Scenario A: Same Computer (Direct Workspace or Desktop $\leftrightarrow$ IDE Transplant)
 ```mermaid
 flowchart LR
-    subgraph Source["Source Workspace"]
+    subgraph Source["Source (Desktop App or IDE)"]
         A[Source Chat<br/>UUID: src_id]
         A --> B[(SQLite DB<br/>Steps & Metadata)]
         A --> C[Brain Folder<br/>Artifacts & Transcripts]
     end
 
-    subgraph Target["Target Workspace"]
+    subgraph Target["Target (Desktop App or IDE)"]
         D[Placeholder Chat<br/>UUID: dst_id]
         D --> E[(Target SQLite DB)]
         D --> F[Target Brain Folder]
@@ -87,19 +89,20 @@ flowchart TD
 ### 1. Moving a Chat on the Same Computer
 
 #### Step 1: Create an Empty Placeholder Chat
-1. In Antigravity, open your **target project/workspace**.
+1. In Antigravity (or Antigravity IDE), open your **target project/workspace**.
 2. Start a new chat, send a 1-word message (like `hi`), and wait for the agent to reply.
    *(This initializes the target database and native workspace bindings).*
 
 > [!TIP]
 > **Safety First — Note Down Your IDs:**
-> It is always recommended to note down your source and target chat titles/IDs in a notepad before closing. Run `python transplant_chat.py --list` to view your recent chat IDs.
+> It is always recommended to note down your source and target chat titles/IDs in a notepad before closing. Run `python transplant_chat.py --list` (or `--ide --list`) to view your recent chat IDs.
 
-#### Step 2: Close Antigravity Completely
-Shut down Google Antigravity so SQLite database locks are released.
+#### Step 2: Close the Application Completely
+Shut down Antigravity (or Antigravity IDE) so SQLite database locks are released.
 
 #### Step 3: Run the Transplant Command
 ```bash
+# Direct transplant (automatically detects Desktop App or IDE):
 python transplant_chat.py <SOURCE_UUID> <DEST_UUID> ["Optional Custom Title"]
 ```
 
@@ -111,6 +114,8 @@ python transplant_chat.py <SOURCE_UUID> <DEST_UUID> ["Optional Custom Title"]
 1. Run `--list` to find your conversation UUID:
    ```bash
    python transplant_chat.py --list
+   # Or for Antigravity IDE:
+   python transplant_chat.py --ide --list
    ```
 2. Export the chat to a portable `.zip` backup:
    ```bash
@@ -123,12 +128,13 @@ python transplant_chat.py <SOURCE_UUID> <DEST_UUID> ["Optional Custom Title"]
 3. Transfer only `my_chat_backup.zip` to your office computer (via USB drive, cloud storage, Slack, or email).
 
 #### Step 2: On Your Office Computer (Import from .zip)
-1. Open Antigravity in your desired office workspace.
+1. Open Antigravity (or IDE) in your desired office workspace.
 2. Start a new chat, send a 1-word message (like `hi`), and wait for the reply.
-3. Close Antigravity completely.
+3. Close the application completely.
 4. Run `--list` on your office computer to find the placeholder chat UUID:
    ```bash
    python transplant_chat.py --list
+   # or: python transplant_chat.py --ide --list
    ```
 5. Import the `.zip` backup into the placeholder chat:
    ```bash
@@ -137,7 +143,7 @@ python transplant_chat.py <SOURCE_UUID> <DEST_UUID> ["Optional Custom Title"]
    # Or specify a custom sidebar title:
    python transplant_chat.py --import my_chat_backup.zip <OFFICE_CHAT_UUID> "Refactored Feature"
    ```
-6. Reopen Antigravity: your complete conversation history, plans, tool actions, and sidebar title are ready in your office workspace!
+6. Reopen Antigravity / IDE: your complete conversation history, plans, tool actions, and sidebar title are ready in your office workspace!
 
 ---
 
@@ -158,6 +164,7 @@ Output:
 =================================================================
  Archive File   : my_chat_backup.zip (0.07 MB)
  Chat Title     : Refactor Auth & Database
+ Source Surface : Desktop App (or IDE)
  Original UUID  : 7b7c0bee-****-****-****-************
  Exported At    : 2026-09-10 14:16:53
  Total Steps    : 42
@@ -170,7 +177,7 @@ Output:
 ## ⚙️ Command-Line Reference
 
 ```text
-usage: transplant_chat.py [-h] [-l] [--limit LIMIT]
+usage: transplant_chat.py [-h] [-l] [--ide] [--limit LIMIT]
                           [-e SRC_ID [OUTPUT_ZIP ...]]
                           [-i ARCHIVE [DST_ID ...]]
                           [--info ARCHIVE_ZIP]
@@ -184,6 +191,7 @@ positional arguments:
 options:
   -h, --help            Show this help message and exit
   -l, --list            List recent conversations with UUIDs, titles, and timestamps
+  --ide                 Target Antigravity IDE workspaces (~/.gemini/antigravity-ide) instead of desktop app
   --limit LIMIT         Maximum conversations to display with --list (default: 15)
   -e, --export          Export conversation to a portable .zip backup file
   -i, --import          Import .zip backup into target placeholder chat
@@ -194,25 +202,27 @@ options:
 
 | Task | Command |
 | :--- | :--- |
-| **List recent chats** | `python transplant_chat.py --list` |
+| **List Desktop chats** | `python transplant_chat.py --list` |
+| **List IDE chats** | `python transplant_chat.py --ide --list` |
 | **Export chat to zip** | `python transplant_chat.py --export <SRC_ID> [output.zip]` |
 | **Inspect zip archive** | `python transplant_chat.py --info <archive.zip>` |
 | **Import zip into chat** | `python transplant_chat.py --import <archive.zip> <DST_ID> ["Title"]` |
 | **Import shortcut** | `python transplant_chat.py <archive.zip> <DST_ID> ["Title"]` |
 | **Direct local transplant**| `python transplant_chat.py <SRC_ID> <DST_ID> ["Title"]` |
+| **Desktop $\leftrightarrow$ IDE transplant**| `python transplant_chat.py <SRC_ID> <DST_ID> ["Title"]` *(auto-detects both)* |
 
 ---
 
 ## 🛡️ Safety & Rollback
 
 Before any modification or import, `transplant_chat.py` automatically creates timestamped safety backups of the target chat:
-- **Database Backup**: `~/.gemini/antigravity/conversations/<DST_ID>.db.backup_<TIMESTAMP>`
-- **Brain Backup**: `~/.gemini/antigravity/brain/<DST_ID>_backup_<TIMESTAMP>`
+- **Database Backup**: `<base_dir>/conversations/<DST_ID>.db.backup_<TIMESTAMP>`
+- **Brain Backup**: `<base_dir>/brain/<DST_ID>_backup_<TIMESTAMP>`
 
 ### Restoring from Backup
 If you ever want to revert the destination chat:
-1. Close Antigravity.
-2. Locate the backup in `~/.gemini/antigravity/conversations/`.
+1. Close Antigravity / IDE.
+2. Locate the backup in `<base_dir>/conversations/`.
 3. Copy `<DST_ID>.db.backup_<TIMESTAMP>` back to `<DST_ID>.db`.
 4. (Optional) Restore the brain directory from `<DST_ID>_backup_<TIMESTAMP>` to `<DST_ID>`.
 
@@ -220,11 +230,18 @@ If you ever want to revert the destination chat:
 
 ## 📂 Antigravity Data Architecture Reference
 
-For reference, Antigravity stores conversation state inside your user profile under `~/.gemini/antigravity/`:
+For reference, Antigravity stores conversation state inside your user profile under `~/.gemini/`:
 
-| Directory / File | Purpose | What `transplant_chat.py` Does |
+| Location | Environment | Purpose |
 | :--- | :--- | :--- |
-| `conversations/<id>.db` | SQLite database storing conversation steps and metadata | Replaces rows in `steps`, `gen_metadata`, `executor_metadata`, `parent_references`, `battle_mode_infos` while preserving workspace `trajectory_meta` & `trajectory_metadata_blob` |
+| `~/.gemini/antigravity/` | **Antigravity Desktop App** | Standard standalone desktop application state |
+| `~/.gemini/antigravity-ide/` | **Antigravity IDE** | AI-first IDE (VS Code-based) state |
+
+Within each environment:
+
+| Subdirectory / File | Purpose | What `transplant_chat.py` Does |
+| :--- | :--- | :--- |
+| `conversations/<id>.db` | SQLite database storing steps and metadata | Replaces rows in `steps`, `gen_metadata`, `executor_metadata`, `parent_references`, `battle_mode_infos` while preserving workspace `trajectory_meta` & `trajectory_metadata_blob` |
 | `brain/<id>/` | Markdown artifacts (`implementation_plan.md`, `walkthrough.md`), scratch scripts, and JSONL transcripts | Copies entire brain folder contents into target |
 | `annotations/<id>.pbtxt` | Protobuf text file storing conversation title and view timestamps | Updates `title:"..."` to match source, archive manifest, or custom title |
 | `exported_chat.zip` | Portable archive generated by `--export` | Contains `manifest.json`, `conversation.db`, `brain/` folder, and `annotations.pbtxt` |
@@ -233,6 +250,7 @@ For reference, Antigravity stores conversation state inside your user profile un
 
 ## 💻 Compatibility
 
+- **Surfaces**: Antigravity Desktop App & Antigravity IDE
 - **OS**: Windows, macOS, Linux
 - **Python**: 3.8 or higher
 - **Dependencies**: None (uses standard Python library: `sqlite3`, `zipfile`, `tempfile`, `json`, `shutil`, `re`, `argparse`, `os`, `sys`)

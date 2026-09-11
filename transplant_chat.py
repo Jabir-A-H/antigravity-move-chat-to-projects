@@ -6,6 +6,7 @@ Transplants full trajectory steps, execution metadata, transcripts, and artifact
 from any source conversation into a destination conversation in another workspace,
 or exports/imports complete conversations as portable .zip archives across devices.
 
+Supports both Antigravity Desktop App and Antigravity IDE.
 Zero Dependencies: Uses Python standard library only.
 """
 
@@ -28,15 +29,39 @@ TABLES_TO_COPY = [
     "battle_mode_infos",
 ]
 
-
-def get_base_dir():
-    """Returns the platform-independent base directory for Antigravity user data."""
-    return os.path.join(os.path.expanduser("~"), ".gemini", "antigravity")
+APP_DIR = os.path.join(os.path.expanduser("~"), ".gemini", "antigravity")
+IDE_DIR = os.path.join(os.path.expanduser("~"), ".gemini", "antigravity-ide")
 
 
-def get_conversation_paths(cid):
+def get_base_dir(is_ide=False):
+    """Returns the base directory for Antigravity user data (Desktop App or IDE)."""
+    return IDE_DIR if is_ide else APP_DIR
+
+
+def locate_conversation(cid, prefer_ide=False):
+    """
+    Finds the directory containing the conversation DB, auto-detecting between
+    Desktop App and IDE workspaces.
+    """
+    primary = IDE_DIR if prefer_ide else APP_DIR
+    secondary = APP_DIR if prefer_ide else IDE_DIR
+
+    if os.path.exists(os.path.join(primary, "conversations", f"{cid}.db")):
+        return primary, "IDE" if prefer_ide else "Desktop App"
+    if os.path.exists(os.path.join(secondary, "conversations", f"{cid}.db")):
+        return secondary, "Desktop App" if prefer_ide else "IDE"
+
+    return primary, "IDE" if prefer_ide else "Desktop App"
+
+
+def get_conversation_paths(cid, is_ide=False, auto_detect=True):
     """Returns standard directory and file paths for a conversation UUID."""
-    base_dir = get_base_dir()
+    if auto_detect:
+        base_dir, surface = locate_conversation(cid, prefer_ide=is_ide)
+    else:
+        base_dir = get_base_dir(is_ide=is_ide)
+        surface = "IDE" if is_ide else "Desktop App"
+
     return {
         "db": os.path.join(base_dir, "conversations", f"{cid}.db"),
         "brain": os.path.join(base_dir, "brain", cid),
@@ -44,6 +69,8 @@ def get_conversation_paths(cid):
         "conv_dir": os.path.join(base_dir, "conversations"),
         "brain_dir": os.path.join(base_dir, "brain"),
         "annot_dir": os.path.join(base_dir, "annotations"),
+        "base_dir": base_dir,
+        "surface": surface,
     }
 
 
@@ -170,9 +197,10 @@ def transplant_brain_folder(src_brain_dir, dst_brain_dir):
     return count
 
 
-def list_conversations(limit=15):
+def list_conversations(limit=15, is_ide=False):
     """Lists recent conversations sorted by modification time to help find UUIDs."""
-    base_dir = get_base_dir()
+    base_dir = get_base_dir(is_ide=is_ide)
+    env_name = "Antigravity IDE" if is_ide else "Antigravity Desktop App"
     conv_dir = os.path.join(base_dir, "conversations")
     annot_dir = os.path.join(base_dir, "annotations")
 
@@ -200,7 +228,7 @@ def list_conversations(limit=15):
     entries.sort(key=lambda x: x[0], reverse=True)
 
     print("=" * 85)
-    print(f" Recent Antigravity Conversations (Top {min(limit, len(entries))})")
+    print(f" Recent {env_name} Conversations (Top {min(limit, len(entries))})")
     print("=" * 85)
     print(f"{'Last Modified':<20} | {'Conversation ID (UUID)':<38} | {'Title'}")
     print("-" * 85)
@@ -214,12 +242,16 @@ def list_conversations(limit=15):
     print("\nNext Steps:")
     print("  - Export to zip:   python transplant_chat.py --export <UUID>")
     print("  - Move on same PC: python transplant_chat.py <SRC_UUID> <DST_UUID> [\"Title\"]")
-    print("  - Import from zip: python transplant_chat.py --import <ARCHIVE.zip> <DST_UUID>\n")
+    print("  - Import from zip: python transplant_chat.py --import <ARCHIVE.zip> <DST_UUID>")
+    if is_ide:
+        print("  - Switch target:   Omit '--ide' to view Desktop App conversations.\n")
+    else:
+        print("  - Switch target:   Add '--ide' to view Antigravity IDE conversations.\n")
 
 
-def export_chat(src_id, output_path=None):
+def export_chat(src_id, output_path=None, is_ide=False):
     """Exports a conversation into a portable .zip archive containing DB, brain, and manifest."""
-    src = get_conversation_paths(src_id)
+    src = get_conversation_paths(src_id, is_ide=is_ide, auto_detect=True)
 
     if not os.path.exists(src["db"]):
         sys.exit(
@@ -250,7 +282,7 @@ def export_chat(src_id, output_path=None):
     print("=" * 65)
     print(" Antigravity Chat Exporter (.zip)")
     print("=" * 65)
-    print(f" Source ID    : {src_id}")
+    print(f" Source ID    : {src_id} [{src['surface']}]")
     print(f" Chat Title   : {title}")
     print(f" Total Steps  : {step_count:,}")
     print(f" Target Zip   : {output_abs_path}")
@@ -277,6 +309,7 @@ def export_chat(src_id, output_path=None):
             "tool": "antigravity-move-chat-to-projects",
             "exported_at": datetime.now().isoformat(),
             "source_id": src_id,
+            "surface": src["surface"],
             "title": title,
             "step_count": step_count,
             "brain_files_count": brain_count,
@@ -303,8 +336,8 @@ def export_chat(src_id, output_path=None):
     print(f"[+] Saved to: {output_abs_path}")
     print("\nNext Steps on your Office/Target Computer:")
     print("  1. Copy this .zip file to your target computer.")
-    print("  2. In Antigravity on that computer, create a new chat in your target project and say 'hi'.")
-    print("  3. Close Antigravity.")
+    print("  2. In Antigravity (or IDE) on that computer, create a new chat in your target project and say 'hi'.")
+    print("  3. Close the application.")
     print(f'  4. Run: python transplant_chat.py --import "{os.path.basename(output_abs_path)}" <TARGET_UUID>\n')
 
 
@@ -334,6 +367,7 @@ def inspect_archive(archive_path):
     print(f" Archive File   : {os.path.abspath(archive_path)} ({size_mb:.2f} MB)")
     if manifest:
         print(f" Chat Title     : {manifest.get('title', '(Untitled)')}")
+        print(f" Source Surface : {manifest.get('surface', 'Antigravity')}")
         print(f" Original UUID  : {manifest.get('source_id', 'Unknown')}")
         print(f" Exported At    : {manifest.get('exported_at', 'Unknown')}")
         print(f" Total Steps    : {manifest.get('step_count', 0):,}")
@@ -344,30 +378,30 @@ def inspect_archive(archive_path):
     print("=" * 65)
     print("\nTo import this chat into an Antigravity workspace:")
     print("  1. In target workspace, create a chat and send 'hi' to initialize bindings.")
-    print("  2. Close Antigravity.")
+    print("  2. Close Antigravity (or Antigravity IDE).")
     print(f'  3. Run: python transplant_chat.py --import "{archive_path}" <TARGET_UUID>\n')
 
 
-def import_chat(archive_path, dst_id, new_title=None):
+def import_chat(archive_path, dst_id, new_title=None, is_ide=False):
     """Imports an exported .zip archive into a target conversation on the current machine."""
     if not os.path.exists(archive_path):
         sys.exit(f"[-] Archive file not found: {archive_path}")
     if not zipfile.is_zipfile(archive_path):
         sys.exit(f"[-] Not a valid zip archive: {archive_path}")
 
-    dst = get_conversation_paths(dst_id)
+    dst = get_conversation_paths(dst_id, is_ide=is_ide, auto_detect=True)
 
     if not os.path.exists(dst["db"]):
         sys.exit(
             f"[-] Target conversation DB not found: {dst['db']}\n"
-            f"[!] Rule: Open your target workspace in Antigravity and send a 1-word message (like 'hi') first so Antigravity creates this database!"
+            f"[!] Rule: Open your target workspace in {dst['surface']} and send a 1-word message (like 'hi') first so Antigravity creates this database!"
         )
 
     print("=" * 65)
     print(" Antigravity Chat Importer")
     print("=" * 65)
     print(f" Archive File   : {archive_path}")
-    print(f" Target Chat ID : {dst_id}")
+    print(f" Target Chat ID : {dst_id} [{dst['surface']}]")
     print("=" * 65)
 
     # 1. Target Safety Backups
@@ -436,20 +470,22 @@ def import_chat(archive_path, dst_id, new_title=None):
     print("\n" + "=" * 65)
     print(" IMPORT COMPLETED SUCCESSFULLY!")
     print("=" * 65)
-    print(f" Chat '{title_to_set}' is now bound to workspace conversation: {dst_id}")
-    print(" You can now reopen Antigravity and continue working!")
+    print(f" Chat '{title_to_set}' is now bound to {dst['surface']} conversation: {dst_id}")
+    print(f" You can now reopen {dst['surface']} and continue working!")
 
 
-def transplant(src_id, dst_id, new_title=None):
+def transplant(src_id, dst_id, new_title=None, is_ide=False):
     """Transplants conversation directly between two local chats on the same machine."""
-    src = get_conversation_paths(src_id)
-    dst = get_conversation_paths(dst_id)
+    src = get_conversation_paths(src_id, is_ide=is_ide, auto_detect=True)
+    dst = get_conversation_paths(dst_id, is_ide=is_ide, auto_detect=True)
 
     print("=" * 65)
     print(" Antigravity Universal Conversation Transplanter")
     print("=" * 65)
-    print(f" Source Conversation ID : {src_id}")
-    print(f" Target Conversation ID : {dst_id}")
+    print(f" Source Conversation ID : {src_id} [{src['surface']}]")
+    print(f" Target Conversation ID : {dst_id} [{dst['surface']}]")
+    if src["surface"] != dst["surface"]:
+        print(f" Cross-App Transplant   : {src['surface']} -> {dst['surface']}")
     print("=" * 65)
 
     # 1. Verify existence
@@ -458,7 +494,7 @@ def transplant(src_id, dst_id, new_title=None):
     if not os.path.exists(dst["db"]):
         sys.exit(
             f"[-] Target DB not found: {dst['db']}\n"
-            f"[!] Rule: Open your target workspace in Antigravity and send a 1-word message (like 'hi') first so Antigravity creates this database!"
+            f"[!] Rule: Open your target workspace in {dst['surface']} and send a 1-word message (like 'hi') first so Antigravity creates this database!"
         )
 
     # 2. Safety Backups
@@ -498,8 +534,8 @@ def transplant(src_id, dst_id, new_title=None):
     print("\n" + "=" * 65)
     print(" TRANSPLANT COMPLETED SUCCESSFULLY!")
     print("=" * 65)
-    print(f" Target conversation {dst_id} has been updated with full history.")
-    print(" You can now reopen Antigravity!")
+    print(f" Target conversation {dst_id} [{dst['surface']}] has been updated with full history.")
+    print(f" You can now reopen {dst['surface']}!")
 
 
 def main():
@@ -510,6 +546,7 @@ def main():
 Examples:
   # List recent conversations:
   python transplant_chat.py --list
+  python transplant_chat.py --ide --list
 
   # Export a chat to a portable .zip backup (for moving to another PC):
   python transplant_chat.py --export <SRC_ID>
@@ -522,7 +559,7 @@ Examples:
   # Inspect a .zip chat backup:
   python transplant_chat.py --info my_backup.zip
 
-  # Transplant directly between two chats on the same PC:
+  # Transplant directly between two chats on the same PC (Desktop or IDE):
   python transplant_chat.py <SRC_ID> <DST_ID> ["Optional Custom Title"]
 """,
     )
@@ -531,6 +568,11 @@ Examples:
         "--list",
         action="store_true",
         help="List recent conversations with UUIDs, titles, and timestamps",
+    )
+    parser.add_argument(
+        "--ide",
+        action="store_true",
+        help="Target Antigravity IDE workspaces (~/.gemini/antigravity-ide) instead of desktop app",
     )
     parser.add_argument(
         "--limit",
@@ -568,7 +610,7 @@ Examples:
 
     # 1. Handle --list
     if args.list:
-        list_conversations(limit=args.limit)
+        list_conversations(limit=args.limit, is_ide=args.ide)
         return
 
     # 2. Handle --info
@@ -580,7 +622,7 @@ Examples:
     if args.export:
         src_id = args.export[0]
         out_zip = args.export[1] if len(args.export) > 1 else None
-        export_chat(src_id, out_zip)
+        export_chat(src_id, out_zip, is_ide=args.ide)
         return
 
     # 4. Handle --import
@@ -592,7 +634,7 @@ Examples:
             sys.exit(1)
         dst_id = args.import_args[1]
         title = args.import_args[2] if len(args.import_args) > 2 else None
-        import_chat(archive, dst_id, title)
+        import_chat(archive, dst_id, title, is_ide=args.ide)
         return
 
     # 5. Handle positional arguments
@@ -610,7 +652,7 @@ Examples:
                 # e.g. python transplant_chat.py backup.zip <DST_ID> [title] -> import
                 dst_id = args.pos_args[1]
                 title = args.pos_args[2] if len(args.pos_args) > 2 else None
-                import_chat(first_arg, dst_id, title)
+                import_chat(first_arg, dst_id, title, is_ide=args.ide)
                 return
         else:
             # Direct transplant between two UUIDs
@@ -618,15 +660,15 @@ Examples:
                 src_id = args.pos_args[0]
                 dst_id = args.pos_args[1]
                 title = args.pos_args[2] if len(args.pos_args) > 2 else None
-                transplant(src_id, dst_id, title)
+                transplant(src_id, dst_id, title, is_ide=args.ide)
                 return
             elif len(args.pos_args) == 1:
                 # Only 1 argument provided and it's not a zip: check if it's a valid source ID
-                src_paths = get_conversation_paths(first_arg)
+                src_paths = get_conversation_paths(first_arg, is_ide=args.ide, auto_detect=True)
                 if os.path.exists(src_paths["db"]):
-                    print(f"[!] Only one conversation ID provided: {first_arg}")
+                    print(f"[!] Only one conversation ID provided: {first_arg} [{src_paths['surface']}]")
                     print("    Did you want to export it? Running export:")
-                    export_chat(first_arg)
+                    export_chat(first_arg, is_ide=args.ide)
                     return
                 else:
                     parser.print_help()
