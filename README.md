@@ -6,7 +6,7 @@
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)]()
 [![Platform: Cross-Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-A lightweight, zero-dependency CLI utility to move, migrate, backup, export, and transplant conversations, agent trajectory history, execution metadata, artifacts, and plans between projects/workspaces in **Google Antigravity Desktop App** and **Antigravity IDE**—either on the same machine or across different computers (e.g. Personal PC to Office PC).
+A lightweight, zero-dependency CLI utility to move, migrate, backup, export, and transplant conversations, agent trajectory history, execution metadata, artifacts, and plans between projects/workspaces in **Google Antigravity Desktop App**, **Antigravity IDE**, and **Antigravity CLI (`agy`)**—either on the same machine or across different computers (e.g. Personal PC to Office PC).
 
 > 📦 **Quick Download:** Download [`transplant_chat.py`](https://raw.githubusercontent.com/Jabir-A-H/antigravity-move-chat-to-projects/main/transplant_chat.py) directly (Right-click → *Save link as...*) or grab the script from the [Latest Release](https://github.com/Jabir-A-H/antigravity-move-chat-to-projects/releases/latest).
 
@@ -32,7 +32,7 @@ Currently, Antigravity has no built-in **"Move Chat to Workspace"** or **"Export
 
 **`transplant_chat.py`** provides a complete migration and backup toolkit:
 1. **Zero External Dependencies:** Runs directly with standard Python 3.8+ (`sqlite3`, `zipfile`, `shutil`, `re`, `json`, `argparse`)—no `pip install` or extra packages needed.
-2. **Desktop App & Antigravity IDE Support:** Seamlessly works with both **Antigravity Desktop App** (`~/.gemini/antigravity`) and **Antigravity IDE** (`~/.gemini/antigravity-ide`), including cross-environment transplants!
+2. **Desktop App, Antigravity IDE & CLI Support:** Seamlessly works with **Antigravity Desktop App** (`~/.gemini/antigravity`), **Antigravity IDE** (`~/.gemini/antigravity-ide`), and **Antigravity CLI** (`~/.gemini/antigravity-cli`), including cross-environment transplants!
 3. **Move Chats Locally:** Move conversations between workspaces on the same computer with a single command.
 4. **Export & Import Across Devices (.zip):** Package an entire conversation into a standalone, compressed `.zip` backup archive. Take just that `.zip` file to your office computer, and import it into any chat.
 5. **Preserves Native Workspace Bindings:** Keeps the destination workspace's valid Protobuf headers, hashes, and session tokens so Antigravity doesn't crash or discard the chat.
@@ -200,7 +200,8 @@ positional arguments:
 options:
   -h, --help            Show this help message and exit
   -l, --list            List recent conversations with UUIDs, titles, and timestamps
-  --ide                 Target Antigravity IDE workspaces (~/.gemini/antigravity-ide) instead of desktop app
+  --ide                 Target Antigravity IDE workspaces (~/.gemini/antigravity-ide)
+  --cli                 Target Antigravity CLI workspaces (~/.gemini/antigravity-cli)
   --limit LIMIT         Maximum conversations to display with --list (default: 15)
   -e, --export          Export conversation to a portable .zip backup file
   -i, --import          Import .zip backup into target placeholder chat
@@ -213,12 +214,13 @@ options:
 | :--- | :--- |
 | **List Desktop chats** | `python transplant_chat.py --list` |
 | **List IDE chats** | `python transplant_chat.py --ide --list` |
+| **List CLI chats** | `python transplant_chat.py --cli --list` |
 | **Export chat to zip** | `python transplant_chat.py --export <SRC_ID> [output.zip]` |
 | **Inspect zip archive** | `python transplant_chat.py --info <archive.zip>` |
 | **Import zip into chat** | `python transplant_chat.py --import <archive.zip> <DST_ID> ["Title"]` |
 | **Import shortcut** | `python transplant_chat.py <archive.zip> <DST_ID> ["Title"]` |
 | **Direct local transplant**| `python transplant_chat.py <SRC_ID> <DST_ID> ["Title"]` |
-| **Desktop $\leftrightarrow$ IDE transplant**| `python transplant_chat.py <SRC_ID> <DST_ID> ["Title"]` *(auto-detects both)* |
+| **Cross-environment transplant**| `python transplant_chat.py <SRC_ID> <DST_ID> ["Title"]` *(auto-detects Desktop, IDE, or CLI)* |
 
 ---
 

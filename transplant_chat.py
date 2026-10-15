@@ -31,36 +31,42 @@ TABLES_TO_COPY = [
 
 APP_DIR = os.path.join(os.path.expanduser("~"), ".gemini", "antigravity")
 IDE_DIR = os.path.join(os.path.expanduser("~"), ".gemini", "antigravity-ide")
+CLI_DIR = os.path.join(os.path.expanduser("~"), ".gemini", "antigravity-cli")
 
 
-def get_base_dir(is_ide=False):
-    """Returns the base directory for Antigravity user data (Desktop App or IDE)."""
+def get_base_dir(is_ide=False, is_cli=False):
+    """Returns the base directory for Antigravity user data (Desktop App, IDE, or CLI)."""
+    if is_cli:
+        return CLI_DIR
     return IDE_DIR if is_ide else APP_DIR
 
 
-def locate_conversation(cid, prefer_ide=False):
+def locate_conversation(cid, prefer_ide=False, prefer_cli=False):
     """
     Finds the directory containing the conversation DB, auto-detecting between
-    Desktop App and IDE workspaces.
+    Desktop App, IDE, and CLI workspaces.
     """
-    primary = IDE_DIR if prefer_ide else APP_DIR
-    secondary = APP_DIR if prefer_ide else IDE_DIR
+    if prefer_cli:
+        order = [(CLI_DIR, "CLI"), (IDE_DIR, "IDE"), (APP_DIR, "Desktop App")]
+    elif prefer_ide:
+        order = [(IDE_DIR, "IDE"), (CLI_DIR, "CLI"), (APP_DIR, "Desktop App")]
+    else:
+        order = [(APP_DIR, "Desktop App"), (IDE_DIR, "IDE"), (CLI_DIR, "CLI")]
 
-    if os.path.exists(os.path.join(primary, "conversations", f"{cid}.db")):
-        return primary, "IDE" if prefer_ide else "Desktop App"
-    if os.path.exists(os.path.join(secondary, "conversations", f"{cid}.db")):
-        return secondary, "Desktop App" if prefer_ide else "IDE"
+    for base_dir, surface in order:
+        if os.path.exists(os.path.join(base_dir, "conversations", f"{cid}.db")):
+            return base_dir, surface
 
-    return primary, "IDE" if prefer_ide else "Desktop App"
+    return order[0][0], order[0][1]
 
 
-def get_conversation_paths(cid, is_ide=False, auto_detect=True):
+def get_conversation_paths(cid, is_ide=False, is_cli=False, auto_detect=True):
     """Returns standard directory and file paths for a conversation UUID."""
     if auto_detect:
-        base_dir, surface = locate_conversation(cid, prefer_ide=is_ide)
+        base_dir, surface = locate_conversation(cid, prefer_ide=is_ide, prefer_cli=is_cli)
     else:
-        base_dir = get_base_dir(is_ide=is_ide)
-        surface = "IDE" if is_ide else "Desktop App"
+        base_dir = get_base_dir(is_ide=is_ide, is_cli=is_cli)
+        surface = "CLI" if is_cli else ("IDE" if is_ide else "Desktop App")
 
     return {
         "db": os.path.join(base_dir, "conversations", f"{cid}.db"),
@@ -96,6 +102,29 @@ def extract_title_from_pbtxt(path):
     return None
 
 
+def get_conversation_title(base_dir, cid):
+    """Tries to extract title from .pbtxt or conversation_summaries.db."""
+    annot_dir = os.path.join(base_dir, "annotations")
+    pbtxt_path = os.path.join(annot_dir, f"{cid}.pbtxt")
+    title = extract_title_from_pbtxt(pbtxt_path)
+    if title:
+        return title
+    # Fallback to conversation_summaries.db (used heavily by CLI)
+    summary_db = os.path.join(base_dir, "conversation_summaries.db")
+    if os.path.exists(summary_db):
+        try:
+            conn = sqlite3.connect(summary_db)
+            res = conn.execute(
+                "SELECT title FROM conversation_summaries WHERE conversation_id=?", (cid,)
+            ).fetchone()
+            conn.close()
+            if res and res[0]:
+                return res[0]
+        except Exception:
+            pass
+    return None
+
+
 def update_title_in_pbtxt(path, title):
     """Updates or creates sidebar title in Antigravity .pbtxt annotation file."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -123,6 +152,35 @@ def update_title_in_pbtxt(path, title):
         except Exception as e:
             print(f"    [!] Note on creating title: {e}")
     return False
+
+
+def update_title_and_summary(dst_paths, title, step_count=0):
+    """Updates .pbtxt annotation file and conversation_summaries.db if target is CLI."""
+    update_title_in_pbtxt(dst_paths["annot"], title)
+    if dst_paths["surface"] == "CLI" or dst_paths["base_dir"] == CLI_DIR:
+        summaries_db = os.path.join(CLI_DIR, "conversation_summaries.db")
+        if os.path.exists(summaries_db):
+            try:
+                cid = os.path.splitext(os.path.basename(dst_paths["db"]))[0]
+                conn = sqlite3.connect(summaries_db)
+                c = conn.cursor()
+                c.execute("""
+                    INSERT INTO conversation_summaries (
+                        conversation_id, title, preview, step_count, last_modified_time,
+                        workspace_uris, status, project_id, not_fully_idle, killed,
+                        last_user_input_time, last_user_input_step_index, app_data_dir
+                    ) VALUES (?, ?, ?, ?, datetime('now'), '[]', 'CASCADE_RUN_STATUS_RUNNING', 'default-cli-project', 0, 0, datetime('now'), -1, 'antigravity-cli')
+                    ON CONFLICT(conversation_id) DO UPDATE SET
+                        title = excluded.title,
+                        preview = excluded.preview,
+                        step_count = excluded.step_count,
+                        last_modified_time = datetime('now')
+                """, (cid, title, title, step_count))
+                conn.commit()
+                conn.close()
+                print(f"    - CLI conversation_summaries.db updated for: '{title}'")
+            except Exception as e:
+                print(f"    [!] Note on CLI summary update: {e}")
 
 
 def get_step_count(db_path):
@@ -197,12 +255,16 @@ def transplant_brain_folder(src_brain_dir, dst_brain_dir):
     return count
 
 
-def list_conversations(limit=15, is_ide=False):
+def list_conversations(limit=15, is_ide=False, is_cli=False):
     """Lists recent conversations sorted by modification time to help find UUIDs."""
-    base_dir = get_base_dir(is_ide=is_ide)
-    env_name = "Antigravity IDE" if is_ide else "Antigravity Desktop App"
+    base_dir = get_base_dir(is_ide=is_ide, is_cli=is_cli)
+    if is_cli:
+        env_name = "Antigravity CLI"
+    elif is_ide:
+        env_name = "Antigravity IDE"
+    else:
+        env_name = "Antigravity Desktop App"
     conv_dir = os.path.join(base_dir, "conversations")
-    annot_dir = os.path.join(base_dir, "annotations")
 
     if not os.path.exists(conv_dir):
         print(f"[-] Conversations directory not found at: {conv_dir}")
@@ -219,8 +281,7 @@ def list_conversations(limit=15, is_ide=False):
         try:
             mtime = os.path.getmtime(full_path)
             cid = os.path.splitext(fname)[0]
-            pbtxt_path = os.path.join(annot_dir, f"{cid}.pbtxt")
-            title = extract_title_from_pbtxt(pbtxt_path) or "(Untitled Conversation)"
+            title = get_conversation_title(base_dir, cid) or "(Untitled Conversation)"
             entries.append((mtime, cid, title))
         except OSError:
             continue
@@ -243,15 +304,12 @@ def list_conversations(limit=15, is_ide=False):
     print("  - Export to zip:   python transplant_chat.py --export <UUID>")
     print("  - Move on same PC: python transplant_chat.py <SRC_UUID> <DST_UUID> [\"Title\"]")
     print("  - Import from zip: python transplant_chat.py --import <ARCHIVE.zip> <DST_UUID>")
-    if is_ide:
-        print("  - Switch target:   Omit '--ide' to view Desktop App conversations.\n")
-    else:
-        print("  - Switch target:   Add '--ide' to view Antigravity IDE conversations.\n")
+    print("  - Switch target:   Use '--ide' for IDE, '--cli' for CLI, or omit for Desktop App.\n")
 
 
-def export_chat(src_id, output_path=None, is_ide=False):
+def export_chat(src_id, output_path=None, is_ide=False, is_cli=False):
     """Exports a conversation into a portable .zip archive containing DB, brain, and manifest."""
-    src = get_conversation_paths(src_id, is_ide=is_ide, auto_detect=True)
+    src = get_conversation_paths(src_id, is_ide=is_ide, is_cli=is_cli, auto_detect=True)
 
     if not os.path.exists(src["db"]):
         sys.exit(
@@ -259,7 +317,7 @@ def export_chat(src_id, output_path=None, is_ide=False):
             f"    Run 'python transplant_chat.py --list' to find valid conversation UUIDs."
         )
 
-    title = extract_title_from_pbtxt(src["annot"]) or "(Untitled Conversation)"
+    title = get_conversation_title(src["base_dir"], src_id) or extract_title_from_pbtxt(src["annot"]) or "(Untitled Conversation)"
     step_count = get_step_count(src["db"])
 
     # Determine destination zip path
@@ -382,14 +440,14 @@ def inspect_archive(archive_path):
     print(f'  3. Run: python transplant_chat.py --import "{archive_path}" <TARGET_UUID>\n')
 
 
-def import_chat(archive_path, dst_id, new_title=None, is_ide=False):
+def import_chat(archive_path, dst_id, new_title=None, is_ide=False, is_cli=False):
     """Imports an exported .zip archive into a target conversation on the current machine."""
     if not os.path.exists(archive_path):
         sys.exit(f"[-] Archive file not found: {archive_path}")
     if not zipfile.is_zipfile(archive_path):
         sys.exit(f"[-] Not a valid zip archive: {archive_path}")
 
-    dst = get_conversation_paths(dst_id, is_ide=is_ide, auto_detect=True)
+    dst = get_conversation_paths(dst_id, is_ide=is_ide, is_cli=is_cli, auto_detect=True)
 
     if not os.path.exists(dst["db"]):
         sys.exit(
@@ -465,7 +523,8 @@ def import_chat(archive_path, dst_id, new_title=None, is_ide=False):
             or "Imported Conversation"
         )
         print(f"\n[+] Updating conversation title in sidebar...")
-        update_title_in_pbtxt(dst["annot"], title_to_set)
+        step_count = get_step_count(dst["db"])
+        update_title_and_summary(dst, title_to_set, step_count=step_count)
 
     print("\n" + "=" * 65)
     print(" IMPORT COMPLETED SUCCESSFULLY!")
@@ -474,10 +533,10 @@ def import_chat(archive_path, dst_id, new_title=None, is_ide=False):
     print(f" You can now reopen {dst['surface']} and continue working!")
 
 
-def transplant(src_id, dst_id, new_title=None, is_ide=False):
+def transplant(src_id, dst_id, new_title=None, is_ide=False, is_cli=False):
     """Transplants conversation directly between two local chats on the same machine."""
-    src = get_conversation_paths(src_id, is_ide=is_ide, auto_detect=True)
-    dst = get_conversation_paths(dst_id, is_ide=is_ide, auto_detect=True)
+    src = get_conversation_paths(src_id, is_ide=is_ide, is_cli=is_cli, auto_detect=True)
+    dst = get_conversation_paths(dst_id, is_ide=is_ide, is_cli=is_cli, auto_detect=True)
 
     print("=" * 65)
     print(" Antigravity Universal Conversation Transplanter")
@@ -529,7 +588,8 @@ def transplant(src_id, dst_id, new_title=None, is_ide=False):
         or "Transplanted Conversation"
     )
     print(f"\n[+] Updating conversation title in sidebar...")
-    update_title_in_pbtxt(dst["annot"], title_to_set)
+    step_count = get_step_count(dst["db"])
+    update_title_and_summary(dst, title_to_set, step_count=step_count)
 
     print("\n" + "=" * 65)
     print(" TRANSPLANT COMPLETED SUCCESSFULLY!")
@@ -572,7 +632,12 @@ Examples:
     parser.add_argument(
         "--ide",
         action="store_true",
-        help="Target Antigravity IDE workspaces (~/.gemini/antigravity-ide) instead of desktop app",
+        help="Target Antigravity IDE workspaces (~/.gemini/antigravity-ide)",
+    )
+    parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="Target Antigravity CLI workspaces (~/.gemini/antigravity-cli)",
     )
     parser.add_argument(
         "--limit",
@@ -610,7 +675,7 @@ Examples:
 
     # 1. Handle --list
     if args.list:
-        list_conversations(limit=args.limit, is_ide=args.ide)
+        list_conversations(limit=args.limit, is_ide=args.ide, is_cli=args.cli)
         return
 
     # 2. Handle --info
@@ -622,7 +687,7 @@ Examples:
     if args.export:
         src_id = args.export[0]
         out_zip = args.export[1] if len(args.export) > 1 else None
-        export_chat(src_id, out_zip, is_ide=args.ide)
+        export_chat(src_id, out_zip, is_ide=args.ide, is_cli=args.cli)
         return
 
     # 4. Handle --import
@@ -634,7 +699,7 @@ Examples:
             sys.exit(1)
         dst_id = args.import_args[1]
         title = args.import_args[2] if len(args.import_args) > 2 else None
-        import_chat(archive, dst_id, title, is_ide=args.ide)
+        import_chat(archive, dst_id, title, is_ide=args.ide, is_cli=args.cli)
         return
 
     # 5. Handle positional arguments
@@ -652,7 +717,7 @@ Examples:
                 # e.g. python transplant_chat.py backup.zip <DST_ID> [title] -> import
                 dst_id = args.pos_args[1]
                 title = args.pos_args[2] if len(args.pos_args) > 2 else None
-                import_chat(first_arg, dst_id, title, is_ide=args.ide)
+                import_chat(first_arg, dst_id, title, is_ide=args.ide, is_cli=args.cli)
                 return
         else:
             # Direct transplant between two UUIDs
@@ -660,15 +725,15 @@ Examples:
                 src_id = args.pos_args[0]
                 dst_id = args.pos_args[1]
                 title = args.pos_args[2] if len(args.pos_args) > 2 else None
-                transplant(src_id, dst_id, title, is_ide=args.ide)
+                transplant(src_id, dst_id, title, is_ide=args.ide, is_cli=args.cli)
                 return
             elif len(args.pos_args) == 1:
                 # Only 1 argument provided and it's not a zip: check if it's a valid source ID
-                src_paths = get_conversation_paths(first_arg, is_ide=args.ide, auto_detect=True)
+                src_paths = get_conversation_paths(first_arg, is_ide=args.ide, is_cli=args.cli, auto_detect=True)
                 if os.path.exists(src_paths["db"]):
                     print(f"[!] Only one conversation ID provided: {first_arg} [{src_paths['surface']}]")
                     print("    Did you want to export it? Running export:")
-                    export_chat(first_arg, is_ide=args.ide)
+                    export_chat(first_arg, is_ide=args.ide, is_cli=args.cli)
                     return
                 else:
                     parser.print_help()
